@@ -28,25 +28,28 @@ def city_request(city: str, locale: str = 'ru_RU') -> GeneratorType:
     entities = json.loads(response.text)["suggestions"][0]["entities"]
 
     for item in entities:
-        if city == item['name']:
+        if city.lower() == item['name'].lower():
             yield item['destinationId']
 
 
-def photo_request(hotel_id: str) -> dict:
+def photo_request(hotel_id: str, amount: int = 4):
     """
     Запрашивает первую фотографию из отеля по id отеля.
     Возвращает переработанный JSON -> dict
 
     :param hotel_id: hotel_id
+    :param amount: кол-во фотографий, которые необходимо вывести
     :return: dict()
     """
     url = "https://hotels4.p.rapidapi.com/properties/get-hotel-photos"
     querystring = {"id": hotel_id}
     response = requests.request("GET", url, headers=headers, params=querystring)
-    return json.loads(response.text)['hotelImages'][0]['baseUrl']
+    data = json.loads(response.text)['hotelImages']
+    result = (data[i]['baseUrl'] for i in range(amount))
+    return result
 
 
-def get_result(city: str, amount: int, time, photo: bool = False) -> GeneratorType:
+def get_result(city: str, amount: int, time, photo: bool = False, p_count: int = 0) -> GeneratorType:
     """
     Выводит результаты для команды lowprice
 
@@ -54,6 +57,7 @@ def get_result(city: str, amount: int, time, photo: bool = False) -> GeneratorTy
     :param amount: кол-во запросов на возвращение (int)
     :param time: время для поиска отелей на текуцщий момент (datetime)
     :param photo: необходимо ли фото? (bool)
+    :param p_count: сколько фото прикрепить нужно? (int) (по-умолчанию 0)
     :return: GeneratorType
     """
     url = "https://hotels4.p.rapidapi.com/properties/list"
@@ -83,7 +87,7 @@ def get_result(city: str, amount: int, time, photo: bool = False) -> GeneratorTy
 
             if photo:
                 id_hotel = item['id']
-                photo_url = photo_request(id_hotel)
+                photo_url = photo_request(id_hotel, p_count)
                 yield [hotel_name, address, distance, price, photo_url]
 
             else:
