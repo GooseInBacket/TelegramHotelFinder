@@ -1,12 +1,9 @@
-from py_bot import *
-
+from py_bot import listen
 
 if __name__ == '__main__':
     print('=======Добро пожаловать=======')
     print('||                          ||')
-    print('||  link: t.me/goose_pybot  ||')
-    print('||  name: @goose_pybot      ||')
-    print('||  status: activated       ||')
+    print('||    status: activated     ||')
     print('||                          ||')
     print('==============================')
     listen()

@@ -1,3 +1,6 @@
+from types import GeneratorType
+
+
 class User:
     """
     Класс пользователей чата. Хранит в себе всех пользователей чата,
@@ -17,9 +20,12 @@ class User:
          | set_city(user_id, city) - задать город, который необходим пользователю
          | set_amount(user_id, value) - задать кол-во результатов
          | set_photo(user_id, value) - задать необходимость фото
+         | set_date_in(user_id, date) - задать дату заезда в отель
+         | set_date_out(user_id, date) - задать дату выезда из отеля
     Atr:
         | __users - хранит в себе всех пользователей чата
     """
+
     def __init__(self):
         self.__users = dict()
 
@@ -41,6 +47,18 @@ class User:
     def get_photo(self, user_id: str):
         return self.__users[user_id].get('photo')
 
+    def get_date_in(self, user_id: str):
+        return self.__users[user_id].get('date_in')
+
+    def get_date_out(self, user_id: str):
+        return self.__users[user_id].get('date_out')
+
+    def set_date_in(self, user_id: str, date):
+        self.__users[user_id]['date_in'] = date
+
+    def set_date_out(self, user_id: str, date):
+        self.__users[user_id]['date_out'] = date
+
     def set_user(self, user_id: str, current_command: str):
         """
         Создаёт в словаре одного из пользователей,
@@ -52,6 +70,8 @@ class User:
         | city - город (для команд lowprice highprice bestdeal)
         | amount - кол-во результатов (для команд lowprice highprice bestdeal)
         | photo - нужны ли фотографии? (для команд lowprice highprice bestdeal)
+        | date_in - дата заезда (для команд lowprice highprice bestdeal)
+        | date_out - дата выезда (для команд lowprice highprice bestdeal)
         | UNKNOW - диапазон цен (bestdeal)
         | UNKNOW - диапазон расстояний (bestdeal)
 
@@ -62,21 +82,21 @@ class User:
         self.__users[user_id] = {'command': current_command,
                                  'step': 1}
 
+    def step_done(self, user_id: str):
+        self.__users[user_id]['step'] += 1
+
+    def set_city(self, user_id: str, city: GeneratorType):
+        self.__users[user_id]['city'] = city
+
+    def set_amount(self, user_id: str, value: int):
+        self.__users[user_id]['amount'] = value
+
+    def set_photo(self, user_id: str, value: str):
+        self.__users[user_id]['photo'] = value
+
     def remove_user(self, user_id: str):
         del self.__users[user_id]
 
     def well_done(self, user_id: str):
         self.__users[user_id]['command'] = None
         self.__users[user_id]['step'] = 1
-
-    def step_done(self, user_id: str):
-        self.__users[user_id]['step'] += 1
-
-    def set_city(self, user_id: str, city: str):
-        self.__users[user_id]['city'] = city
-
-    def set_amount(self, user_id: str, value: str):
-        self.__users[user_id]['amount'] = value
-
-    def set_photo(self, user_id: str, value: str):
-        self.__users[user_id]['photo'] = value

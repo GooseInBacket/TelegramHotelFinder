@@ -1,12 +1,13 @@
+import datetime
 import json
 import requests
 
-from decouple import config
 from types import GeneratorType
+from settings import KEY
 
 headers = {
     'x-rapidapi-host': "hotels4.p.rapidapi.com",
-    'x-rapidapi-key': config('API_KEY')
+    'x-rapidapi-key': KEY
 }
 
 
@@ -49,13 +50,19 @@ def photo_request(hotel_id: str, amount: int = 4):
     return result
 
 
-def get_result(city: str, amount: int, time, photo: bool = False, p_count: int = 0) -> GeneratorType:
+def get_result(city: str,
+               amount: int,
+               check_in: datetime.date,
+               check_out: datetime.date,
+               photo: bool = False,
+               p_count: int = 0) -> GeneratorType:
     """
     Выводит результаты для команды lowprice
 
     :param city: id города (str)
     :param amount: кол-во запросов на возвращение (int)
-    :param time: время для поиска отелей на текуцщий момент (datetime)
+    :param check_in: старт диапазона в котором нужно найти результат
+    :param check_out: конец диапазона в котором нужно найти результат
     :param photo: необходимо ли фото? (bool)
     :param p_count: сколько фото прикрепить нужно? (int) (по-умолчанию 0)
     :return: GeneratorType
@@ -64,8 +71,8 @@ def get_result(city: str, amount: int, time, photo: bool = False, p_count: int =
     querystring = {"destinationId": city,
                    "pageNumber": "1",
                    "pageSize": "10",
-                   "checkIn": time,
-                   "checkOut": time,
+                   "check_in": check_in,
+                   "check_out": check_out,
                    "adults1": "1",
                    "sortOrder": "PRICE",
                    "locale": "ru_RU",
@@ -75,7 +82,6 @@ def get_result(city: str, amount: int, time, photo: bool = False, p_count: int =
     results = json.loads(response.text)['data']['body']['searchResults']['results']
 
     for i, item in enumerate(results):
-        # если сгенерировано больше необходимого
         if i + 1 > amount:
             break
 
