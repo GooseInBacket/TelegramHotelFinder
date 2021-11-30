@@ -85,7 +85,7 @@ class User:
     def step_done(self, user_id: str):
         self.__users[user_id]['step'] += 1
 
-    def set_city(self, user_id: str, city: GeneratorType):
+    def set_city(self, user_id: str, city: str):
         self.__users[user_id]['city'] = city
 
     def set_amount(self, user_id: str, value: int):

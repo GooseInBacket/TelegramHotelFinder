@@ -1,10 +1,10 @@
 from user import User
+from Exeptions import *
 from settings import *
 from botrequests.api_request import city_request, get_result
 from datetime import datetime
 from typing import Union
 from types import GeneratorType
-import logging
 
 
 def low_price(users: User,
@@ -31,7 +31,7 @@ def low_price(users: User,
 
     if step == 1:
         if city_data_validity(text):
-            users.set_city(user_id, city_request(text.capitalize()))
+            users.set_city(user_id, text.capitalize())
             users.step_done(user_id)
             return DATE_IN
         return ERR_NOT_STR
@@ -52,7 +52,7 @@ def low_price(users: User,
 
     elif step == 4:
         if text.isdigit():
-            if 0 < int(text) < 11:
+            if 0 < int(text) <= RANGE_RESULT:
                 users.set_amount(user_id, int(text))
                 users.step_done(user_id)
                 return NEED_PHOTO
@@ -72,7 +72,7 @@ def low_price(users: User,
         if text.isdigit():
             if int(text) in range(2, 11):
                 return last_step(users, user_id, int(text))
-            raise ERR_RANGE
+            return ERR_RANGE
         return ERR_NOT_INT
 
 
@@ -104,7 +104,7 @@ def validate(date_text: str) -> bool:
         return False
 
 
-def last_step(users: User, user_id: str, ph_count: int = 0) -> Union[str, GeneratorType]:
+def last_step(users: User, user_id: str, ph_count: int = 0) -> Union[str, list]:
     """
     Выполнение последнего шага в команде lowprice.
     Осуществляет группировку всех полученных данных.
@@ -116,17 +116,23 @@ def last_step(users: User, user_id: str, ph_count: int = 0) -> Union[str, Genera
     :return: str | GeneratorType
     """
     try:
-        city = users.get_city(user_id)
+        city = city_request(users.get_city(user_id))
         amount = users.get_amount(user_id)
         photo = users.get_photo(user_id)
         date_in = users.get_date_in(user_id)
         date_out = users.get_date_out(user_id)
 
-        return get_result(next(city), amount, date_in, date_out, photo, ph_count)
-    except StopIteration:
+        return get_result(city, amount, date_in, date_out, photo=photo, p_count=ph_count)
+    except ApiCloseErr:
+        users.well_done(user_id)
+        return ERR_API
+
+    except NoCityErr:
         last_command = users.get_user_command(user_id)
         users.well_done(user_id)
+        return ERR_NO_CITY + last_command
 
-        logging.error('Ошибка запроса. В переменной city - пустое значение')
-
-        return ERR_BAD_REQ + last_command
+    except ConnectFail:
+        last_command = users.get_user_command(user_id)
+        users.well_done(user_id)
+        return ERR_CONN + last_command

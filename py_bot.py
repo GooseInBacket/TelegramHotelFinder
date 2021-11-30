@@ -1,10 +1,13 @@
 import datetime
+import time
+
 import telebot
 
 from user import User
 from settings import *
-from types import GeneratorType
+from loguru import logger
 from botrequests.lowprice import low_price
+from botrequests.highprice import high_price
 from telebot.types import ReplyKeyboardRemove, InputMediaPhoto
 from telegram_bot_calendar import DetailedTelegramCalendar
 
@@ -12,7 +15,7 @@ bot = telebot.TeleBot(TOKEN)
 users = User()
 
 
-@bot.message_handler(commands=['start', 'help', 'lowprice'])
+@bot.message_handler(commands=['start', 'help', 'lowprice', 'highprice'])
 def command_handler(message) -> None:
     """
     Осуществляет перехват команд и создаёт первую реакцию на них
@@ -35,7 +38,10 @@ def command_handler(message) -> None:
     elif text == 'lowprice':
         send_answer(user_id, GIVE_ME_CITY)
 
-    print(f'Обработка команды для пользователя {user_id}')
+    elif text == 'highprice':
+        send_answer(user_id, GIVE_ME_CITY)
+
+    logger.info(f'Обработка команды {text} для пользователя {user_id}')
 
 
 @bot.message_handler(func=lambda message: users.get_user_command(message.from_user.id))
@@ -61,7 +67,17 @@ def message_handler(message) -> None:
                 if int(text) in range(2, 11) and step == 6:
                     send_answer(user_id, WAIT)
             answer = low_price(users, user_id, text)
-            low_price_cmd(user_id, answer)
+            response_handler(user_id, answer)
+
+        elif user_command == '/highprice':
+            if text in ('да', 'нет'):
+                if text == 'нет' and step == 5:
+                    send_answer(user_id, WAIT)
+            elif text.isdigit():
+                if int(text) in range(2, 11) and step == 6:
+                    send_answer(user_id, WAIT)
+            answer = high_price(users, user_id, text)
+            response_handler(user_id, answer)
 
 
 @bot.message_handler(content_types=['text'])
@@ -128,38 +144,59 @@ def send_answer(user_id: str, answer: str, k_board: bool = False, date_table: bo
         bot.send_message(user_id, answer, reply_markup=ReplyKeyboardRemove())
 
 
-def low_price_cmd(user_id: str, msg: str) -> None:
+def create_photo_group(user_id: str, content: list) -> bool:
+    """
+    Создание и отправка группы фото пользователю
+    :param user_id:
+    :param content:
+    :return:
+    """
+    caption = '\n'.join(content[:4])
+    links = [InputMediaPhoto(link[:-10] + 'z.jpg', caption=caption if i == 0 else '')
+             for i, link in enumerate(content[-1])]
+    try:
+        bot.send_media_group(user_id, links)
+        return True
+    except Exception as err:
+        logger.error(err)
+        return False
+
+
+def response_handler(user_id: str, msg: str) -> None:
     """
     Обработчик последнего шага команды lowprice
 
     - Оформляет текстовое сообщение
     - Оформляет фотографии
+    - Задаёт старт для ивента с календарем
 
     :param user_id: id пользователя (str)
     :param msg: сообщение (str)
     :return: None
     """
-
+    max_result = users.get_amount(user_id)
     result_count = 0
-    if isinstance(msg, GeneratorType):
-        for i in range(users.get_amount(user_id)):
-            try:
-                result_count = i + 1
-                content = next(msg)
-                if users.get_photo(user_id):
-                    caption = '\n'.join(content[:4])
-                    links = [InputMediaPhoto(link[:-10] + 'w.jpg', caption=caption if i == 0 else '')
-                             for i, link in enumerate(content[-1])]
-                    bot.send_media_group(user_id, links)
+    if isinstance(msg, list):
+        for content_block in msg:
+            if len(content_block) == 5:
+                status_code = create_photo_group(user_id, content_block)
+
+                if status_code:
+                    result_count += status_code
                 else:
-                    send_answer(user_id, '\n'.join(content[:4]))
-            except StopIteration:
-                users.well_done(user_id)
-                break
+                    logger.error(f'Пропускаю. {content_block}')
+                    continue
+
+                if result_count == max_result:
+                    break
+            else:
+                send_answer(user_id, '\n'.join(content_block[:4]))
+            time.sleep(3)
+
         send_answer(user_id, RESULT.format(result_count))
         users.well_done(user_id)
 
-        print(f"{user_id} - закончил выполнение команд")
+        logger.success(f'{user_id} получил готовый результат')
 
     elif msg == DATE_IN:
         send_answer(user_id, msg, date_table=True)
