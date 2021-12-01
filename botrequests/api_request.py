@@ -5,8 +5,7 @@ import time
 import requests
 
 from Exeptions import *
-from settings import MAX_RESULT
-from settings import KEY, NONE
+from settings import KEY, NONE, MAX_RESULT
 from loguru import logger
 from requests import ConnectionError
 
@@ -17,18 +16,17 @@ headers = {
 
 
 @logger.catch()
-def city_request(city: str, locale: str = 'ru_RU') -> str:
+def city_request(city: str) -> str:
     """
-    Запрашивает destinationId по названию города
+    Запрашивает "destinationId" по названию города
 
     :param city: название города (str)
-    :param locale: в какой локации. По-умолчанию Россия (str)
-    :return: GeneratorType
+    :return: str
     """
     url = "https://hotels4.p.rapidapi.com/locations/search"
 
     querystring = {"query": city.capitalize(),
-                   "locale": locale
+                   "locale": 'ru_RU'
                    }
     while True:
         logger.info('Запрашиваю "destinationId" по городу "{}"'.format(city))
@@ -51,6 +49,9 @@ def city_request(city: str, locale: str = 'ru_RU') -> str:
         except ConnectionError as err:
             logger.error(err)
             time.sleep(1)
+        except Exception as err:
+            logger.error(err)
+            raise Exception
 
 
 @logger.catch()
@@ -61,7 +62,7 @@ def photo_request(hotel_id: str, amount: int = 4):
 
     :param hotel_id: hotel_id
     :param amount: кол-во фотографий, которые необходимо вывести
-    :return: dict()
+    :return: Any
     """
     url = "https://hotels4.p.rapidapi.com/properties/get-hotel-photos"
     querystring = {"id": hotel_id}
@@ -90,16 +91,22 @@ def get_result(city: str,
                amount: int,
                check_in: datetime.date,
                check_out: datetime.date,
+               price_min: str = '',
+               price_max: str = '',
+               distance_f_center: int = None,
                sort_order: str = 'PRICE',
                photo: bool = False,
                p_count: int = 0) -> list:
     """
-    Выводит результаты для команды lowprice, highprice
+    Выводит результаты для команды lowprice, highprice, bestdeal
 
     :param city: id города (str)
     :param amount: кол-во запросов на возвращение (int)
     :param check_in: старт диапазона в котором нужно найти результат
     :param check_out: конец диапазона в котором нужно найти результат
+    :param price_min: минимальная цена за номер (str) (по-умолчанию = str()) для bestdeal
+    :param price_max: максимальная цена за номер (str) (по-умолчанию = str()) для bestdeal
+    :param distance_f_center: расстояние от центра (int) (по-умолчанию = None) для bestdeal
     :param sort_order: сортировка результатов (PRICE - по возрастанию,
                                                PRICE_HIGHEST_FIRST - по убыванию)
     :param photo: необходимо ли фото? (bool)
@@ -113,6 +120,8 @@ def get_result(city: str,
                    "check_in": check_in,
                    "check_out": check_out,
                    "adults1": "1",
+                   "priceMin": price_min,
+                   "priceMax": price_max,
                    "sortOrder": sort_order,
                    "locale": "ru_RU",
                    "currency": "RUB"}
@@ -120,28 +129,20 @@ def get_result(city: str,
     logger.info('Получение результата запроса по {}'.format(querystring))
     try:
         response = requests.request("GET", url, headers=headers, params=querystring)
-
         results = json.loads(response.text)['data']['body']['searchResults']['results']
 
         status_code = response.status_code
+
         content_result = list()
         if status_code == 200:
             logger.info(f'Данные получены. Кол-во {len(results)}.Обрабатываю...')
             for item in results[:amount + 5]:
-                if 'ratePlan' in item.keys():
-                    hotel_name = item['name']
-                    address = f"Адрес: {item['address'].get('streetAddress', NONE)}"
-                    distance = f"{item['landmarks'][0].get('distance', NONE)} от центра"
-                    price = f"Цена за ночь: {item['ratePlan']['price'].get('current', NONE)}"
-
-                    if photo:
-                        id_hotel = item['id']
-                        photo_url = photo_request(id_hotel, p_count)
-                        content_block = (hotel_name, address, distance, price, photo_url)
-                    else:
-                        content_block = (hotel_name, address, distance, price)
-
-                    content_result.append(content_block)
+                if distance_f_center:
+                    if correct_distance(item['landmarks'][0].get('distance')) <= distance_f_center:
+                        if 'ratePlan' in item.keys():
+                            content_result.append(create_content(item, photo, p_count))
+                else:
+                    content_result.append(create_content(item, photo, p_count))
             return content_result
 
         elif status_code == 429:
@@ -151,3 +152,35 @@ def get_result(city: str,
     except ConnectionError as err:
         logger.error(err)
         raise ConnectFail
+
+
+@logger.catch()
+def create_content(item, photo: bool, p_count: int) -> tuple:
+    """
+    Создаёт блок контента исходя из полученных данных от пользователя
+    :param item: объект с полезной информацией из API
+    :param photo: есть ли необходимость в фото? (bool)
+    :param p_count: если есть, то сколько? (int)
+    :return: tuple
+    """
+    hotel_name = item['name']
+    address = f"Адрес: {item['address'].get('streetAddress', NONE)}"
+    distance = f"{item['landmarks'][0].get('distance')} от центра"
+    price = f"Цена за ночь: {item['ratePlan']['price'].get('current', NONE)}"
+
+    if photo:
+        id_hotel = item['id']
+        photo_url = photo_request(id_hotel, p_count)
+        return hotel_name, address, distance, price, photo_url
+    else:
+        return hotel_name, address, distance, price
+
+
+@logger.catch()
+def correct_distance(str_distance: str) -> float:
+    """
+    Корректирует контент 'дистанции от центра' во float для команды bestdeal
+    :param str_distance: строка, которую нужно отредактировать во float
+    :return: float
+    """
+    return float('.'.join(str_distance.split()[0].split(',')))

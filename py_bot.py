@@ -8,6 +8,7 @@ from settings import *
 from loguru import logger
 from botrequests.lowprice import low_price
 from botrequests.highprice import high_price
+from botrequests.bestdeal import best_deal
 from telebot.types import ReplyKeyboardRemove, InputMediaPhoto
 from telegram_bot_calendar import DetailedTelegramCalendar
 
@@ -15,7 +16,7 @@ bot = telebot.TeleBot(TOKEN)
 users = User()
 
 
-@bot.message_handler(commands=['start', 'help', 'lowprice', 'highprice'])
+@bot.message_handler(commands=['start', 'help', 'lowprice', 'highprice', 'bestdeal'])
 def command_handler(message) -> None:
     """
     Осуществляет перехват команд и создаёт первую реакцию на них
@@ -35,10 +36,7 @@ def command_handler(message) -> None:
         users.well_done(user_id)
         send_answer(user_id, COMMAND_LIST)
 
-    elif text == 'lowprice':
-        send_answer(user_id, GIVE_ME_CITY)
-
-    elif text == 'highprice':
+    elif text in ('lowprice', 'highprice', 'bestdeal'):
         send_answer(user_id, GIVE_ME_CITY)
 
     logger.info(f'Обработка команды {text} для пользователя {user_id}')
@@ -57,27 +55,30 @@ def message_handler(message) -> None:
     user_command = users.get_user_command(user_id)
     text = message.text.lower()
     step = users.get_step(user_id)
+    answer = None
 
-    if user_command:
+    if user_command in ('/lowprice', '/highprice'):
+        if text in ('да', 'нет'):
+            if text == 'нет' and step == 5:
+                send_answer(user_id, WAIT)
+        elif text.isdigit():
+            if int(text) in range(2, 11) and step == 6:
+                send_answer(user_id, WAIT)
         if user_command == '/lowprice':
-            if text in ('да', 'нет'):
-                if text == 'нет' and step == 5:
-                    send_answer(user_id, WAIT)
-            elif text.isdigit():
-                if int(text) in range(2, 11) and step == 6:
-                    send_answer(user_id, WAIT)
             answer = low_price(users, user_id, text)
-            response_handler(user_id, answer)
-
-        elif user_command == '/highprice':
-            if text in ('да', 'нет'):
-                if text == 'нет' and step == 5:
-                    send_answer(user_id, WAIT)
-            elif text.isdigit():
-                if int(text) in range(2, 11) and step == 6:
-                    send_answer(user_id, WAIT)
+        else:
             answer = high_price(users, user_id, text)
-            response_handler(user_id, answer)
+
+    elif user_command == '/bestdeal':
+        if text in ('да', 'нет'):
+            if text == 'нет' and step == 8:
+                send_answer(user_id, WAIT)
+        elif text.isdigit():
+            if int(text) in range(2, 11) and step == 9:
+                send_answer(user_id, WAIT)
+        answer = best_deal(users, user_id, text)
+
+    response_handler(user_id, answer)
 
 
 @bot.message_handler(content_types=['text'])
@@ -102,20 +103,31 @@ def callback_calendar_handler(call):
 
     :return: None
     """
-    result, key = DetailedTelegramCalendar(locale='ru',
-                                           min_date=datetime.date.today()).process(call.data)[:2]
     user_id = call.message.chat.id
+    date = users.get_cal_date(user_id)
     msg_id = call.message.message_id
+    command = users.get_user_command(user_id)
+    answer = None
+
+    result, key = DetailedTelegramCalendar(locale='ru', min_date=date).process(call.data)[:2]
 
     if not result and key:
-        bot.edit_message_text("Выберете месяц", user_id, msg_id, reply_markup=key)
+        bot.edit_message_text("Выберете дату", user_id, msg_id, reply_markup=key)
     elif result:
         bot.edit_message_text(f"Вы выбрали {result}", user_id, msg_id)
 
     if isinstance(result, datetime.date):
-        answer = low_price(users, user_id, str(result))
-        step = users.get_step(user_id)
+        if command == '/lowprice':
+            answer = low_price(users, user_id, str(result))
 
+        elif command == '/highprice':
+            answer = high_price(users, user_id, str(result))
+
+        elif command == '/bestdeal':
+            answer = best_deal(users, user_id, str(result))
+
+        step = users.get_step(user_id)
+        users.set_cal_date(user_id, result)
         if step == 3:
             send_answer(user_id, answer, date_table=True)
         else:
@@ -152,7 +164,7 @@ def create_photo_group(user_id: str, content: list) -> bool:
     :return:
     """
     caption = '\n'.join(content[:4])
-    links = [InputMediaPhoto(link[:-10] + 'z.jpg', caption=caption if i == 0 else '')
+    links = [InputMediaPhoto(link[:-10] + 's.jpg', caption=caption if i == 0 else '')
              for i, link in enumerate(content[-1])]
     try:
         bot.send_media_group(user_id, links)
@@ -191,6 +203,7 @@ def response_handler(user_id: str, msg: str) -> None:
                     break
             else:
                 send_answer(user_id, '\n'.join(content_block[:4]))
+                result_count += 1
             time.sleep(3)
 
         send_answer(user_id, RESULT.format(result_count))
@@ -202,7 +215,9 @@ def response_handler(user_id: str, msg: str) -> None:
         send_answer(user_id, msg, date_table=True)
 
     else:
-        if users.get_step(user_id) == 5:
+        cmd = users.get_user_command(user_id)
+        step = users.get_step(user_id)
+        if (cmd in ('/lowprice', '/highprice') and step == 5) or (cmd == '/bestdeal' and step == 8):
             send_answer(user_id, msg, k_board=True)
         else:
             send_answer(user_id, msg)
