@@ -4,7 +4,7 @@ import time
 
 import requests
 
-from Exeptions import *
+from bot_exceptions import *
 from settings import KEY, NONE, MAX_RESULT
 from loguru import logger
 from requests import ConnectionError
@@ -75,7 +75,7 @@ def photo_request(hotel_id: str, amount: int = 4):
             if status_code == 200:
                 data = json.loads(response.text)['hotelImages']
                 amount = len(data) if len(data) < amount else amount
-                result = (data[i]['baseUrl'] for i in range(amount))
+                result = [data[i]['baseUrl'] for i in range(amount)]
                 logger.success('Удачное получение фотографий')
                 return result
             elif status_code == 429:
@@ -132,17 +132,23 @@ def get_result(city: str,
         results = json.loads(response.text)['data']['body']['searchResults']['results']
 
         status_code = response.status_code
-
+        count = 0
         content_result = list()
+
         if status_code == 200:
             logger.info(f'Данные получены. Кол-во {len(results)}.Обрабатываю...')
-            for item in results[:amount + 5]:
+            for item in results:
                 if distance_f_center:
                     if correct_distance(item['landmarks'][0].get('distance')) <= distance_f_center:
                         if 'ratePlan' in item.keys():
+                            count += 1
                             content_result.append(create_content(item, photo, p_count))
-                else:
+                elif 'ratePlan' in item.keys():
+                    count += 1
                     content_result.append(create_content(item, photo, p_count))
+
+                if count == amount:
+                    return content_result
             return content_result
 
         elif status_code == 429:
@@ -163,17 +169,19 @@ def create_content(item, photo: bool, p_count: int) -> tuple:
     :param p_count: если есть, то сколько? (int)
     :return: tuple
     """
+    id_hotel = item['id']
+
     hotel_name = item['name']
     address = f"Адрес: {item['address'].get('streetAddress', NONE)}"
     distance = f"{item['landmarks'][0].get('distance')} от центра"
     price = f"Цена за ночь: {item['ratePlan']['price'].get('current', NONE)}"
+    link = f'Ссылка: https://ru.hotels.com/ho{id_hotel}'
 
     if photo:
-        id_hotel = item['id']
         photo_url = photo_request(id_hotel, p_count)
-        return hotel_name, address, distance, price, photo_url
+        return hotel_name, address, distance, price, link, photo_url
     else:
-        return hotel_name, address, distance, price
+        return hotel_name, address, distance, price, link
 
 
 @logger.catch()

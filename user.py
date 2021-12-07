@@ -19,6 +19,9 @@ class User:
          |  get_low_price(user_id) - возвращает нижний диапазон цен
          |  get_high_price(user_id) - возвращает верхний диапазон цен
          |  get_distance(user_id) - возвращает дистанцию от центра
+         |  get_message_time - возвращает время, когда была запрошена команда
+         |  get_history - возвращает историю команд пользователя
+         |  set_message_time - задать время, когда пришла команда
          |  set_date_in(user_id, date) - задать дату въезда
          |  set_date_out(user_id, date) - задать дату выезда
          |  set_cal_date(user_id, date) - задать специальную дату для календаря телеграмма
@@ -31,6 +34,9 @@ class User:
          |  remove_user(user_id) - удалить пользователя из хранилища
          |  well_done(user_id) - полное, удачное отправление результата пользователю
          |  step_done(user_id) - полное, удачное выполнение шага команды
+         |  add_to_history(user_id) - добавляет запись в историю
+         |  is_user(user_id) - этот пользователь есть в списке текущих пользователей?
+         |  fresh(user_id) - обновить данные для пользователя
     Atr:
         | __users - хранит в себе всех пользователей чата
     """
@@ -74,6 +80,15 @@ class User:
     def get_distance(self, user_id: str):
         return self.__users[user_id].get('distance')
 
+    def get_message_time(self, user_id: str):
+        return self.__users[user_id].get('message_time')
+
+    def get_history(self, user_id: str):
+        return self.__users[user_id].get('history')
+
+    def set_message_time(self, user_id: str, time: datetime):
+        self.__users[user_id]['message_time'] = time
+
     def set_date_in(self, user_id: str, date):
         self.__users[user_id]['date_in'] = date
 
@@ -93,28 +108,10 @@ class User:
         self.__users[user_id]['distance'] = distance
 
     def set_user(self, user_id: str, current_command: str):
-        """
-        Создаёт в словаре одного из пользователей,
-        которые в текущий момент работают с ботом
-
-        Значения индексовв данных пользователя:
-        | command - текущая команда
-        | step - текущий шаг (по-умолчанию 1)
-        | city - город (для команд lowprice highprice bestdeal)
-        | amount - кол-во результатов (для команд lowprice highprice bestdeal)
-        | photo - нужны ли фотографии? (для команд lowprice highprice bestdeal)
-        | date_in - дата заезда (для команд lowprice highprice bestdeal)
-        | date_out - дата выезда (для команд lowprice highprice bestdeal)
-        | UNKNOW - диапазон цен (bestdeal)
-        | UNKNOW - диапазон расстояний (bestdeal)
-
-        :param user_id: id пользователя (str)
-        :param current_command: текущая к выполнению команда (str)
-        :return: None
-        """
         self.__users[user_id] = {'command': current_command,
                                  'step': 1,
-                                 'cal_date': datetime.date.today()}
+                                 'cal_date': datetime.date.today(),
+                                 'history': list()}
 
     def step_done(self, user_id: str):
         self.__users[user_id]['step'] += 1
@@ -134,3 +131,14 @@ class User:
     def well_done(self, user_id: str):
         self.__users[user_id]['command'] = None
         self.__users[user_id]['step'] = 1
+
+    def add_to_history(self, user_id: str, item):
+        self.__users[user_id].get('history').append(item)
+
+    def is_user(self, user_id: str):
+        return user_id in self.__users.keys()
+
+    def fresh(self, user_id: str, current_command: str):
+        self.__users[user_id]['command'] = current_command
+        self.__users[user_id]['step'] = 1
+        self.__users[user_id]['cal_date'] = datetime.date.today()

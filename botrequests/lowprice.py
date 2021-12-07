@@ -1,5 +1,5 @@
 from user import User
-from Exeptions import *
+from bot_exceptions import *
 from settings import *
 from botrequests.api_request import city_request, get_result
 from datetime import datetime

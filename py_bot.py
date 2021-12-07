@@ -1,5 +1,4 @@
 import datetime
-import time
 
 import telebot
 
@@ -9,6 +8,7 @@ from loguru import logger
 from botrequests.lowprice import low_price
 from botrequests.highprice import high_price
 from botrequests.bestdeal import best_deal
+from botrequests.history import make_history
 from telebot.types import ReplyKeyboardRemove, InputMediaPhoto
 from telegram_bot_calendar import DetailedTelegramCalendar
 
@@ -16,7 +16,7 @@ bot = telebot.TeleBot(TOKEN)
 users = User()
 
 
-@bot.message_handler(commands=['start', 'help', 'lowprice', 'highprice', 'bestdeal'])
+@bot.message_handler(commands=['start', 'help', 'lowprice', 'highprice', 'bestdeal', 'history'])
 def command_handler(message) -> None:
     """
     Осуществляет перехват команд и создаёт первую реакцию на них
@@ -25,8 +25,12 @@ def command_handler(message) -> None:
     :return: None
     """
     user_id = message.from_user.id
-    users.set_user(user_id, message.text)
-    text = message.text[1:]
+    msg_time = datetime.datetime.fromtimestamp(message.date).strftime('%Y-%m-%d %H:%M:%S')
+    msg = message.text
+
+    users.set_user(user_id, msg) if not users.is_user(user_id) else users.fresh(user_id, msg)
+
+    text = msg[1:]
 
     if text == 'start':
         users.well_done(user_id)
@@ -36,7 +40,17 @@ def command_handler(message) -> None:
         users.well_done(user_id)
         send_answer(user_id, COMMAND_LIST)
 
+    elif text == 'history':
+        users.well_done(user_id)
+        content = make_history(users.get_history(user_id))
+        if isinstance(content, list):
+            for content_block in content:
+                send_answer(user_id, content_block)
+        else:
+            send_answer(user_id, content)
+
     elif text in ('lowprice', 'highprice', 'bestdeal'):
+        users.set_message_time(user_id, msg_time)
         send_answer(user_id, GIVE_ME_CITY)
 
     logger.info(f'Обработка команды {text} для пользователя {user_id}')
@@ -163,7 +177,7 @@ def create_photo_group(user_id: str, content: list) -> bool:
     :param content:
     :return:
     """
-    caption = '\n'.join(content[:4])
+    caption = '\n'.join(content[:5])
     links = [InputMediaPhoto(link[:-10] + 's.jpg', caption=caption if i == 0 else '')
              for i, link in enumerate(content[-1])]
     try:
@@ -176,7 +190,7 @@ def create_photo_group(user_id: str, content: list) -> bool:
 
 def response_handler(user_id: str, msg: str) -> None:
     """
-    Обработчик последнего шага команды lowprice
+    Обработчик последнего шага команд lowprice, highprice, bestdeal
 
     - Оформляет текстовое сообщение
     - Оформляет фотографии
@@ -187,27 +201,26 @@ def response_handler(user_id: str, msg: str) -> None:
     :return: None
     """
     max_result = users.get_amount(user_id)
+    command = users.get_user_command(user_id)
+    msg_date = users.get_message_time(user_id)
     result_count = 0
     if isinstance(msg, list):
+
         for content_block in msg:
-            if len(content_block) == 5:
+            if len(content_block) == 6:
                 status_code = create_photo_group(user_id, content_block)
-
-                if status_code:
-                    result_count += status_code
-                else:
-                    logger.error(f'Пропускаю. {content_block}')
-                    continue
-
-                if result_count == max_result:
-                    break
+                result_count += status_code
             else:
-                send_answer(user_id, '\n'.join(content_block[:4]))
+                send_answer(user_id, '\n'.join(content_block))
                 result_count += 1
-            time.sleep(3)
+
+            if result_count == max_result:
+                break
 
         send_answer(user_id, RESULT.format(result_count))
         users.well_done(user_id)
+
+        users.add_to_history(user_id, [command, msg_date, msg[:max_result]])
 
         logger.success(f'{user_id} получил готовый результат')
 

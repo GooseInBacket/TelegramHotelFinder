@@ -1,6 +1,6 @@
 from user import User
 from settings import *
-from Exeptions import *
+from bot_exceptions import *
 from botrequests.api_request import city_request, get_result
 from datetime import datetime
 from typing import Union
