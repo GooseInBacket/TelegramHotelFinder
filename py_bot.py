@@ -167,7 +167,7 @@ def send_answer(user_id: str, answer: str, k_board: bool = False, date_table: bo
         calendar = DetailedTelegramCalendar(locale='ru', min_date=datetime.date.today()).build()[0]
         bot.send_message(user_id, answer, reply_markup=calendar)
     else:
-        bot.send_message(user_id, answer, reply_markup=ReplyKeyboardRemove())
+        bot.send_message(user_id, answer, reply_markup=ReplyKeyboardRemove(), disable_web_page_preview=True)
 
 
 def create_photo_group(user_id: str, content: list) -> bool:

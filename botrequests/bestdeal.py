@@ -3,7 +3,7 @@ from bot_exceptions import *
 from settings import *
 from botrequests.api_request import city_request, get_result
 from datetime import datetime
-from typing import Union
+from typing import Union, Tuple
 from types import GeneratorType
 
 
@@ -132,7 +132,7 @@ def validate(date_text: str) -> bool:
         return False
 
 
-def validate_price_range(price_range: str) -> Union[bool, tuple[int, int]]:
+def validate_price_range(price_range: str) -> Union[bool, Tuple[int, int]]:
     min_range, max_range = price_range.split(' - ')
     if min_range.isdigit() and max_range.isdigit():
         min_range, max_range = int(min_range), int(max_range)
@@ -142,7 +142,7 @@ def validate_price_range(price_range: str) -> Union[bool, tuple[int, int]]:
     return False
 
 
-def validate_distance(distance_range: str) -> Union[bool, tuple[float, float]]:
+def validate_distance(distance_range: str) -> Union[bool, Tuple[float, float]]:
     min_dist, max_dist = map(lambda x: x.strip(), distance_range.split('-'))
     try:
         min_dist, max_dist = float(min_dist), float(max_dist)
