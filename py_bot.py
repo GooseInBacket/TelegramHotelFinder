@@ -8,7 +8,7 @@ from loguru import logger
 from botrequests.lowprice import low_price
 from botrequests.highprice import high_price
 from botrequests.bestdeal import best_deal
-from botrequests.history import make_history
+from botrequests.history import make_history, add_to_history
 from telebot.types import ReplyKeyboardRemove, InputMediaPhoto
 from telegram_bot_calendar import DetailedTelegramCalendar
 
@@ -42,7 +42,7 @@ def command_handler(message) -> None:
 
     elif text == 'history':
         users.well_done(user_id)
-        content = make_history(users.get_history(user_id))
+        content = make_history(user_id)
         if isinstance(content, list):
             for content_block in content:
                 send_answer(user_id, content_block)
@@ -152,22 +152,29 @@ def send_answer(user_id: str, answer: str, k_board: bool = False, date_table: bo
     """
     Обработчик отправки сообщений.
     Включает и выключает клавиатуру.
+    Подключает и отключает календарь в сообщении
 
     :param user_id: id необходимого пользователя (str)
     :param answer: ответ для пользователя (str)
     :param k_board: необходимо ли вывести клавиатуру? (bool)
-    :param date_table: ....
+    :param date_table: нужно ли прикрепить календарь в сообщении? (bool)
     :return: None
     """
+
     if k_board:
         keyboard = telebot.types.ReplyKeyboardMarkup(True)
         keyboard.row('Да', 'Нет')
         bot.send_message(user_id, answer, reply_markup=keyboard)
+
     elif date_table:
         calendar = DetailedTelegramCalendar(locale='ru', min_date=datetime.date.today()).build()[0]
         bot.send_message(user_id, answer, reply_markup=calendar)
+
     else:
-        bot.send_message(user_id, answer, reply_markup=ReplyKeyboardRemove(), disable_web_page_preview=True)
+        bot.send_message(user_id,
+                         answer,
+                         reply_markup=ReplyKeyboardRemove(),
+                         disable_web_page_preview=True)
 
 
 def create_photo_group(user_id: str, content: list) -> bool:
@@ -204,8 +211,8 @@ def response_handler(user_id: str, msg: str) -> None:
     command = users.get_user_command(user_id)
     msg_date = users.get_message_time(user_id)
     result_count = 0
-    if isinstance(msg, list):
 
+    if isinstance(msg, list):
         for content_block in msg:
             if len(content_block) == 6:
                 status_code = create_photo_group(user_id, content_block)
@@ -220,7 +227,7 @@ def response_handler(user_id: str, msg: str) -> None:
         send_answer(user_id, RESULT.format(result_count))
         users.well_done(user_id)
 
-        users.add_to_history(user_id, [command, msg_date, msg[:max_result]])
+        add_to_history(user_id, [command, msg_date, msg[:max_result]])
 
         logger.success(f'{user_id} получил готовый результат')
 

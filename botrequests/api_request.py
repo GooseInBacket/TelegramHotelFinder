@@ -15,7 +15,6 @@ headers = {
 }
 
 
-@logger.catch()
 def city_request(city: str) -> str:
     """
     Запрашивает "destinationId" по названию города
@@ -49,12 +48,8 @@ def city_request(city: str) -> str:
         except ConnectionError as err:
             logger.error(err)
             time.sleep(1)
-        except Exception as err:
-            logger.error(err)
-            raise Exception
 
 
-@logger.catch()
 def photo_request(hotel_id: str, amount: int = 4):
     """
     Запрашивает первую фотографию из отеля по id отеля.
