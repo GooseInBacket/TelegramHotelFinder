@@ -130,7 +130,7 @@ def last_step(users: User, user_id: str, ph_count: int = 0) -> Union[str, list]:
     except NoCityErr:
         last_command = users.get_user_command(user_id)
         users.well_done(user_id)
-        return ERR_NO_CITY + last_command
+        return ERR_NO_CITY.format(users.get_city(user_id), last_command)
 
     except ConnectFail:
         last_command = users.get_user_command(user_id)

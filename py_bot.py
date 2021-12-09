@@ -27,10 +27,9 @@ def command_handler(message) -> None:
     user_id = message.from_user.id
     msg_time = datetime.datetime.fromtimestamp(message.date).strftime('%Y-%m-%d %H:%M:%S')
     msg = message.text
+    text = msg[1:]
 
     users.set_user(user_id, msg) if not users.is_user(user_id) else users.fresh(user_id, msg)
-
-    text = msg[1:]
 
     if text == 'start':
         users.well_done(user_id)
@@ -185,8 +184,9 @@ def create_photo_group(user_id: str, content: list) -> bool:
     :return:
     """
     caption = '\n'.join(content[:5])
-    links = [InputMediaPhoto(link[:-10] + 's.jpg', caption=caption if i == 0 else '')
+    links = [InputMediaPhoto(link[:-10] + f'{SIZE}.jpg', caption=caption if i == 0 else '')
              for i, link in enumerate(content[-1])]
+
     try:
         bot.send_media_group(user_id, links)
         return True

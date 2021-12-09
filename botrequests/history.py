@@ -27,6 +27,17 @@ def add_to_history(user_id: str, content: list) -> None:
 
     with closing(sqlite3.connect('history.db')) as con:
         cursor = con.cursor()
+        cursor.executemany("""INSERT INTO users_data(
+        user_id, 
+        command, 
+        msg_date, 
+        data) VALUES(?, ?, ?, ?);""", to_save)
+        con.commit()
+
+
+def create_table():
+    with closing(sqlite3.connect('history.db')) as con:
+        cursor = con.cursor()
         cursor.execute("""CREATE TABLE IF NOT EXISTS users_data(
         id INT PRIMaRY KEY,
         user_id TEXT,
@@ -34,13 +45,6 @@ def add_to_history(user_id: str, content: list) -> None:
         msg_date TEXT,
         data TEXT);
         """)
-
-        cursor.executemany("""INSERT INTO users_data(
-        user_id, 
-        command, 
-        msg_date, 
-        data) VALUES(?, ?, ?, ?);""", to_save)
-        con.commit()
 
 
 def create_string(string: str) -> str:

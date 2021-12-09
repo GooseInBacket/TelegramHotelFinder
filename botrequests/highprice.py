@@ -72,7 +72,7 @@ def high_price(users: User,
         if text.isdigit():
             if int(text) in range(2, 11):
                 return last_step(users, user_id, int(text))
-            raise ERR_RANGE
+            return ERR_RANGE
         return ERR_NOT_INT
 
 

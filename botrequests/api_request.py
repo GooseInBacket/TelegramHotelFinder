@@ -5,7 +5,7 @@ import time
 import requests
 
 from bot_exceptions import *
-from settings import KEY, NONE, MAX_RESULT
+from settings import KEY, NONE, MAX_RESULT, ERR_BAD_KEY
 from loguru import logger
 from requests import ConnectionError
 
@@ -127,17 +127,18 @@ def get_result(city: str,
         results = json.loads(response.text)['data']['body']['searchResults']['results']
 
         status_code = response.status_code
-        count = 0
         content_result = list()
+        count = 0
 
         if status_code == 200:
             logger.info(f'Данные получены. Кол-во {len(results)}.Обрабатываю...')
+
             for item in results:
                 if distance_f_center:
-                    if correct_distance(item['landmarks'][0].get('distance')) <= distance_f_center:
-                        if 'ratePlan' in item.keys():
-                            count += 1
-                            content_result.append(create_content(item, photo, p_count))
+                    distance = item['landmarks'][0].get('distance')
+                    if correct_distance(distance) <= distance_f_center and 'ratePlan' in item.keys():
+                        count += 1
+                        content_result.append(create_content(item, photo, p_count))
                 elif 'ratePlan' in item.keys():
                     count += 1
                     content_result.append(create_content(item, photo, p_count))
@@ -147,7 +148,7 @@ def get_result(city: str,
             return content_result
 
         elif status_code == 429:
-            logger.critical(f'API-KEY исчерпал кол-во запросов. Status code: {status_code}')
+            logger.critical(ERR_BAD_KEY.format(status_code))
             raise ApiCloseErr
 
     except ConnectionError as err:
